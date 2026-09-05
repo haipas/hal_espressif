@@ -62,10 +62,15 @@ static inline void* os_wpa_malloc_func(size_t _size)
 
 static inline void* os_wpa_realloc_func(void *_ptr, size_t _size)
 {
-	if (_ptr) {
-		esp_wifi_free_func(_ptr);
-	}
-	return os_wpa_malloc_func(_size);
+	/* fw#328: this used to free-then-malloc, which breaks the realloc
+	 * contract twice over: the old contents were silently discarded (the
+	 * supplicant kept building EAPOL/IE buffers on heap junk), and on
+	 * allocation failure the caller's pointer was already freed, so the
+	 * standard hostap "free old on realloc failure" error path became a
+	 * double free -- exactly the "heap corruption (double free?)" panics
+	 * seen on hardware. Use the real realloc, same as
+	 * esp_wifi_realloc_func() above. */
+	return shared_multi_heap_realloc(SMH_REG_ATTR_EXTERNAL, _ptr, _size);
 }
 
 static inline void* os_wpa_calloc_func(size_t _nmemb, size_t _size)
