@@ -34,10 +34,10 @@ if(CONFIG_SOC_SERIES_ESP32S31)
     ../../components/bootloader_support/private_include
     ../../components/bt/controller/${CONFIG_SOC_SERIES}
     ../../components/bt/include/${CONFIG_SOC_SERIES}/include
-    ../../components/bt/porting/include
-    ../../components/bt/porting/npl/zephyr/include
-    ../../components/bt/porting/npl/zephyr/include/nimble
-    ../../components/bt/porting/transport/include
+    ../../components/bt/porting_btdm/zephyr/include
+    ../../components/bt/porting_btdm/controller/btdm_common/include
+    ../../components/bt/porting_btdm/controller/ble/include
+    ../../components/bt/porting_btdm/transport/include
     ../../components/driver/deprecated
     ../../components/driver/gpio/include
     ../../components/driver/include
@@ -648,14 +648,21 @@ if(CONFIG_SOC_SERIES_ESP32S31)
   ## BT definitions
   if (CONFIG_BT)
 
+    # ESP32-S31 uses the dual-mode BTDM controller architecture of ESP-IDF
+    # v6.1 (porting_btdm), built here for BLE only with the VHCI transport.
+    set(BTDM_DIR ../../components/bt/porting_btdm)
+
     zephyr_sources(
       ../../components/esp_phy/src/btbb_init.c
-      ../../components/bt/porting/mem/bt_osi_mem.c
-      ../../components/bt/porting/mem/os_mempool.c
-      ../../components/bt/porting/mem/os_msys_init.c
-      ../../components/bt/porting/npl/zephyr/src/npl_os_zephyr.c
-      ../../components/bt/porting/transport/driver/vhci/hci_driver_standard.c
-      ../../components/bt/porting/transport/src/hci_transport.c
+      ${BTDM_DIR}/zephyr/src/btdm_osal_zephyr.c
+      ${BTDM_DIR}/controller/btdm_common/src/btdm_coex.c
+      ${BTDM_DIR}/controller/btdm_common/src/btdm_external.c
+      ${BTDM_DIR}/controller/btdm_common/src/btdm_log.c
+      ${BTDM_DIR}/controller/btdm_common/src/btdm_lp.c
+      ${BTDM_DIR}/controller/ble/src/ble.c
+      ${BTDM_DIR}/controller/ble/src/ble_msys.c
+      ${BTDM_DIR}/transport/src/hci_transport.c
+      ${BTDM_DIR}/transport/driver/vhci/hci_driver_standard.c
       ../../components/bt/controller/${CONFIG_SOC_SERIES}/bt.c
       )
 
@@ -667,8 +674,8 @@ if(CONFIG_SOC_SERIES_ESP32S31)
       ../port/stubs/phy_stubs.c
       )
 
-    # ble, with btbb after ble_app to resolve its baseband calls
-    esp_blobs_link(ble_app btbb)
+    # ble controller, the btdm common core, then btbb for the baseband calls
+    esp_blobs_link(ble_app btdm_common btbb)
 
   endif()
 
