@@ -63,7 +63,11 @@ hci_driver_vhci_host_recv_with_type(uint8_t data_type, uint8_t *data, uint16_t l
     return -1;
 }
 
-#if 0
+/* Zephyr: the host driver (hci_esp32.c) waits for notify_host_send_available()
+ * before each packet, so signal it once the callback is registered and after
+ * every packet handed to the controller.
+ */
+#if defined(__ZEPHYR__)
 static void
 hci_driver_vhci_host_send_available(void)
 {
@@ -287,6 +291,9 @@ esp_vhci_host_register_callback(const esp_vhci_host_callback_t *callback)
     }
 
     s_hci_driver_vhci_env.host_recv_cb = callback;
+#if defined(__ZEPHYR__)
+    hci_driver_vhci_host_send_available();
+#endif
     return ESP_OK;
 }
 
@@ -298,6 +305,9 @@ esp_vhci_host_send_packet(uint8_t *data, uint16_t len)
     }
 
     hci_driver_vhci_tx(data[0], data, len, HCI_DRIVER_DIR_H2C);
+#if defined(__ZEPHYR__)
+    hci_driver_vhci_host_send_available();
+#endif
 }
 
 bool

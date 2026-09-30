@@ -47,8 +47,12 @@
 #endif // CONFIG_BT_BLUEDROID_ENABLED
 #include "esp_private/sleep_retention.h"
 
+#ifdef __ZEPHYR__
+#include <zephyr/kernel.h>
+#else
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#endif
 
 #include "esp_private/periph_ctrl.h"
 #include "esp_sleep.h"
@@ -775,6 +779,14 @@ esp_err_t esp_ble_controller_mem_release(esp_bt_mode_t mode)
     return ESP_OK;
 }
 
+#ifdef __ZEPHYR__
+esp_err_t esp_ble_mem_release(esp_bt_mode_t mode)
+{
+    /* Zephyr has no heap_caps_add_region(); the BT .bss/.data stay reserved. */
+    ARG_UNUSED(mode);
+    return ESP_OK;
+}
+#else
 static esp_err_t try_heap_caps_add_region(intptr_t start, intptr_t end)
 {
     int ret = heap_caps_add_region(start, end);
@@ -854,6 +866,7 @@ esp_err_t esp_ble_mem_release(esp_bt_mode_t mode)
 
     return ESP_OK;
 }
+#endif /* __ZEPHYR__ */
 
 
 esp_bt_controller_status_t esp_ble_controller_get_status(void)
@@ -1113,7 +1126,20 @@ exit:
 
 #endif // CONFIG_BT_NIMBLE_ENABLED
 
-#if  (!CONFIG_BT_NIMBLE_ENABLED) && (CONFIG_BT_CONTROLLER_ENABLED == true)
+#if defined(__ZEPHYR__) && !CONFIG_BT_LE_SM_LEGACY && !CONFIG_BT_LE_SM_SC
+/* Zephyr: the host implements SMP, so the controller-side LE security crypto
+ * (key pair, DHKey, AES-CMAC) is not built. Report failure if the controller
+ * asks for it anyway.
+ */
+int ble_sm_ecc_aes_cmac(const uint8_t *key, const uint8_t *in, size_t len, uint8_t *out)
+{
+    ARG_UNUSED(key);
+    ARG_UNUSED(in);
+    ARG_UNUSED(len);
+    ARG_UNUSED(out);
+    return -1;
+}
+#elif  (!CONFIG_BT_NIMBLE_ENABLED) && (CONFIG_BT_CONTROLLER_ENABLED == true)
 #define BLE_SM_KEY_ERR 0x17
 #if CONFIG_BT_LE_CRYPTO_STACK_MBEDTLS
 #include "mbedtls/aes.h"
