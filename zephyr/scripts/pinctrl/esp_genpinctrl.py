@@ -134,16 +134,20 @@ def get_pinmux(dev_name, pin_name, pin_info, io):
     return pinmux
 
 
-def get_rmii_pinmux(pin_name, io):
-    # The Ethernet RMII data plane is routed through dedicated EMAC
-    # IOMUX pad functions instead of the GPIO matrix, so it uses the
-    # ESP32_RMII_PINMUX() encoding (signal slot + GPIO) rather than
-    # ESP32_PINMUX(). The slot maps to an ESP_RMII_* constant.
-    slot = 'ESP_RMII_' + pin_name.upper()
+# Ethernet data planes that are routed through dedicated EMAC IOMUX pad
+# functions instead of the GPIO matrix. They use the ESP32_<BUS>_PINMUX()
+# encoding (signal slot + GPIO) rather than ESP32_PINMUX(); the slot maps
+# to an ESP_<BUS>_* constant.
+ETH_IOMUX_BUSES = ('rmii', 'rgmii')
 
-    pinmux = 'RMII_' + pin_name.upper() + '_GPIO' + str(io)
+
+def get_eth_iomux_pinmux(bus, pin_name, io):
+    bus = bus.upper()
+    slot = 'ESP_' + bus + '_' + pin_name.upper()
+
+    pinmux = bus + '_' + pin_name.upper() + '_GPIO' + str(io)
     define_str = '#define ' + pinmux
-    macro_str = 'ESP32_RMII_PINMUX(' + str(io) + ', ' + slot + ')'
+    macro_str = 'ESP32_' + bus + '_PINMUX(' + str(io) + ', ' + slot + ')'
 
     if len(define_str + ' ' + macro_str) > 100:
         pinmux = define_str + ' \\\n\t' + macro_str + '\n'
@@ -183,18 +187,15 @@ def main(pcfg_in):
         # diffs minimal and easily trackable
         dev_info = sorted(dev_info.items())
 
-        is_rmii = dev_name.lower() == 'rmii'
+        is_eth_iomux = dev_name.lower() in ETH_IOMUX_BUSES
 
         for (pin_name, pin_info) in dev_info:
-            if is_rmii:
-                name = 'RMII_' + pin_name.upper()
-            else:
-                name = dev_name.upper() + '_' + pin_name.upper()
+            name = dev_name.upper() + '_' + pin_name.upper()
             f.write('/**\n * @name ' + name + '\n * @{\n */\n')
             ios = get_gpios(pin_info)
             for io in ios:
-                if is_rmii:
-                    pinmux = get_rmii_pinmux(pin_name, io)
+                if is_eth_iomux:
+                    pinmux = get_eth_iomux_pinmux(dev_name, pin_name, io)
                 else:
                     pinmux = get_pinmux(dev_name, pin_name, pin_info, io)
                 f.write(pinmux)
