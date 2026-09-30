@@ -554,6 +554,15 @@ if(CONFIG_SOC_SERIES_ESP32S31)
     ../../components/esp_hal_touch_sens/touch_sens_hal.c
     )
 
+  # Ethernet MAC (GMAC, RGMII capable) used by the Zephyr eth_esp32 and
+  # mdio_esp32 drivers. emac_clk.c provides the MPLL/CPLL/APLL tables the
+  # driver uses to derive the RGMII TX clock.
+  zephyr_sources_ifdef(CONFIG_ESP32S31_EMAC
+    ../../components/esp_hal_emac/emac_hal.c
+    ../../components/esp_hal_emac/${CONFIG_SOC_SERIES}/emac_periph.c
+    ../../components/esp_hal_emac/${CONFIG_SOC_SERIES}/emac_clk.c
+    )
+
   if (CONFIG_ESP32_TEMP)
     zephyr_include_directories(
     ../../components/esp_driver_tsens/include
