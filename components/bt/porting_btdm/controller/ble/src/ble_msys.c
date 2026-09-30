@@ -6,6 +6,9 @@
 #include "esp_err.h"
 #include "queue.h"
 #include "sdkconfig.h"
+#ifdef __ZEPHYR__
+#include "btdm_zephyr_cfg.h"
+#endif
 
 #if CONFIG_BT_NIMBLE_ENABLED
 #include "syscfg/syscfg.h"

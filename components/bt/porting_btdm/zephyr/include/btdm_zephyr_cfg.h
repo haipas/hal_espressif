@@ -1,0 +1,188 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/*
+ * ESP-IDF menuconfig values for the BTDM controller porting layer
+ * (porting_btdm) under Zephyr.
+ *
+ * The porting layer and esp_bt.h read CONFIG_BT_CTRL_*, CONFIG_BT_LE_* and
+ * CONFIG_BTDM_CTRL_* symbols from ESP-IDF's sdkconfig. Zephyr has no such
+ * Kconfig symbols for the ESP32-S31, so they are provided here. The values
+ * are the ESP-IDF v6.1 defaults for an ESP32-S31 "controller only", BLE-only
+ * build with the RAM (VHCI) HCI transport, with these deliberate changes:
+ *
+ * - the controller task stack size follows CONFIG_ESP32_BT_CONTROLLER_STACK_SIZE;
+ * - the low power clock is the main XTAL (no controller sleep, no 32 kHz
+ *   crystal dependency);
+ * - LE security (SMP crypto in the controller) is off: the Zephyr host does
+ *   its own SMP crypto.
+ *
+ * Every value may be overridden by defining the symbol before this header.
+ */
+
+#ifndef BTDM_ZEPHYR_CFG_H_
+#define BTDM_ZEPHYR_CFG_H_
+
+#ifndef CONFIG_BT_ENABLED
+#define CONFIG_BT_ENABLED 1
+#endif
+#ifndef CONFIG_BT_CONTROLLER_ONLY
+#define CONFIG_BT_CONTROLLER_ONLY 1
+#endif
+#ifndef CONFIG_BT_CONTROLLER_ENABLED
+#define CONFIG_BT_CONTROLLER_ENABLED 1
+#endif
+
+/* Controller mode and task */
+#ifndef CONFIG_BTDM_CTRL_MODE_BLE_ONLY
+#define CONFIG_BTDM_CTRL_MODE_BLE_ONLY 1
+#endif
+#ifndef CONFIG_BT_CTRL_PINNED_TO_CORE
+#define CONFIG_BT_CTRL_PINNED_TO_CORE 0
+#endif
+#ifndef CONFIG_BT_CTRL_TASK_STACK_SIZE
+#define CONFIG_BT_CTRL_TASK_STACK_SIZE CONFIG_ESP32_BT_CONTROLLER_STACK_SIZE
+#endif
+#ifndef CONFIG_BT_DUAL_MODE_ARCH
+#define CONFIG_BT_DUAL_MODE_ARCH 1
+#endif
+#ifndef CONFIG_BT_CTRL_BLE_ENABLE
+#define CONFIG_BT_CTRL_BLE_ENABLE 1
+#endif
+#ifndef CONFIG_BT_CTRL_HCI_CMD_NUM
+#define CONFIG_BT_CTRL_HCI_CMD_NUM 5
+#endif
+#ifndef CONFIG_BT_CTRL_HCI_INTERFACE_USE_RAM
+#define CONFIG_BT_CTRL_HCI_INTERFACE_USE_RAM 1
+#endif
+#ifndef CONFIG_BT_CTRL_MULTI_LINK_ENABLED
+#define CONFIG_BT_CTRL_MULTI_LINK_ENABLED 1
+#endif
+#ifndef CONFIG_BT_CTRL_LP_CLK_SRC_MAIN_XTAL
+#define CONFIG_BT_CTRL_LP_CLK_SRC_MAIN_XTAL 1
+#endif
+
+/* LE features */
+#ifndef CONFIG_BT_LE_50_FEATURE_SUPPORT
+#define CONFIG_BT_LE_50_FEATURE_SUPPORT 1
+#endif
+#ifndef CONFIG_BT_LE_LL_CFG_FEAT_LE_2M_PHY
+#define CONFIG_BT_LE_LL_CFG_FEAT_LE_2M_PHY 1
+#endif
+#ifndef CONFIG_BT_LE_LL_CFG_FEAT_LE_CODED_PHY
+#define CONFIG_BT_LE_LL_CFG_FEAT_LE_CODED_PHY 1
+#endif
+#ifndef CONFIG_BT_LE_EXT_ADV
+#define CONFIG_BT_LE_EXT_ADV 1
+#endif
+#ifndef CONFIG_BT_LE_MAX_EXT_ADV_INSTANCES
+#define CONFIG_BT_LE_MAX_EXT_ADV_INSTANCES 1
+#endif
+#ifndef CONFIG_BT_LE_EXT_ADV_MAX_SIZE
+#define CONFIG_BT_LE_EXT_ADV_MAX_SIZE 1650
+#endif
+#ifndef CONFIG_BT_LE_ENABLE_PERIODIC_ADV
+#define CONFIG_BT_LE_ENABLE_PERIODIC_ADV 1
+#endif
+#ifndef CONFIG_BT_LE_PERIODIC_ADV_SYNC_TRANSFER
+#define CONFIG_BT_LE_PERIODIC_ADV_SYNC_TRANSFER 1
+#endif
+#ifndef CONFIG_BT_LE_MAX_PERIODIC_SYNCS
+#define CONFIG_BT_LE_MAX_PERIODIC_SYNCS 1
+#endif
+#ifndef CONFIG_BT_LE_MAX_PERIODIC_ADVERTISER_LIST
+#define CONFIG_BT_LE_MAX_PERIODIC_ADVERTISER_LIST 5
+#endif
+
+/* Memory */
+#ifndef CONFIG_BT_LE_MSYS_1_BLOCK_COUNT
+#define CONFIG_BT_LE_MSYS_1_BLOCK_COUNT 12
+#endif
+#ifndef CONFIG_BT_LE_MSYS_1_BLOCK_SIZE
+#define CONFIG_BT_LE_MSYS_1_BLOCK_SIZE 256
+#endif
+#ifndef CONFIG_BT_LE_MSYS_2_BLOCK_COUNT
+#define CONFIG_BT_LE_MSYS_2_BLOCK_COUNT 24
+#endif
+#ifndef CONFIG_BT_LE_MSYS_2_BLOCK_SIZE
+#define CONFIG_BT_LE_MSYS_2_BLOCK_SIZE 320
+#endif
+#ifndef CONFIG_BT_LE_MSYS_BUF_FROM_HEAP
+#define CONFIG_BT_LE_MSYS_BUF_FROM_HEAP 1
+#endif
+#ifndef CONFIG_BT_LE_ACL_BUF_COUNT
+#define CONFIG_BT_LE_ACL_BUF_COUNT 10
+#endif
+#ifndef CONFIG_BT_LE_ACL_BUF_SIZE
+#define CONFIG_BT_LE_ACL_BUF_SIZE 517
+#endif
+#ifndef CONFIG_BT_LE_HCI_EVT_BUF_SIZE
+#define CONFIG_BT_LE_HCI_EVT_BUF_SIZE 257
+#endif
+#ifndef CONFIG_BT_LE_HCI_EVT_HI_BUF_COUNT
+#define CONFIG_BT_LE_HCI_EVT_HI_BUF_COUNT 30
+#endif
+#ifndef CONFIG_BT_LE_HCI_EVT_LO_BUF_COUNT
+#define CONFIG_BT_LE_HCI_EVT_LO_BUF_COUNT 8
+#endif
+#ifndef CONFIG_BT_LE_MSYS_INIT_IN_CONTROLLER
+#define CONFIG_BT_LE_MSYS_INIT_IN_CONTROLLER 1
+#endif
+
+/* Link layer */
+#ifndef CONFIG_BT_LE_LL_RESOLV_LIST_SIZE
+#define CONFIG_BT_LE_LL_RESOLV_LIST_SIZE 4
+#endif
+#ifndef CONFIG_BT_LE_LL_CFG_FEAT_LE_ENCRYPTION
+#define CONFIG_BT_LE_LL_CFG_FEAT_LE_ENCRYPTION 1
+#endif
+#ifndef CONFIG_BT_LE_WHITELIST_SIZE
+#define CONFIG_BT_LE_WHITELIST_SIZE 12
+#endif
+#ifndef CONFIG_BT_LE_LL_DUP_SCAN_LIST_COUNT
+#define CONFIG_BT_LE_LL_DUP_SCAN_LIST_COUNT 20
+#endif
+#ifndef CONFIG_BT_LE_LL_SCA
+#define CONFIG_BT_LE_LL_SCA 60
+#endif
+#ifndef CONFIG_BT_LE_MAX_CONNECTIONS
+#define CONFIG_BT_LE_MAX_CONNECTIONS 3
+#endif
+#ifndef CONFIG_BT_LE_COEX_PHY_CODED_TX_RX_TLIM_DIS
+#define CONFIG_BT_LE_COEX_PHY_CODED_TX_RX_TLIM_DIS 1
+#endif
+#ifndef CONFIG_BT_LE_COEX_PHY_CODED_TX_RX_TLIM_EFF
+#define CONFIG_BT_LE_COEX_PHY_CODED_TX_RX_TLIM_EFF 0
+#endif
+#ifndef CONFIG_BT_LE_USE_ESP_TIMER
+#define CONFIG_BT_LE_USE_ESP_TIMER 1
+#endif
+#ifndef CONFIG_BT_CTRL_BLE_ADV_REPORT_FLOW_CTRL_SUPP
+#define CONFIG_BT_CTRL_BLE_ADV_REPORT_FLOW_CTRL_SUPP 1
+#endif
+#ifndef CONFIG_BT_CTRL_BLE_ADV_REPORT_FLOW_CTRL_NUM
+#define CONFIG_BT_CTRL_BLE_ADV_REPORT_FLOW_CTRL_NUM 100
+#endif
+#ifndef CONFIG_BT_CTRL_BLE_ADV_REPORT_DISCARD_THRSHOLD
+#define CONFIG_BT_CTRL_BLE_ADV_REPORT_DISCARD_THRSHOLD 20
+#endif
+#ifndef CONFIG_BT_LE_SCAN_DUPL
+#define CONFIG_BT_LE_SCAN_DUPL 1
+#endif
+#ifndef CONFIG_BT_LE_SCAN_DUPL_TYPE
+#define CONFIG_BT_LE_SCAN_DUPL_TYPE 0
+#endif
+#ifndef CONFIG_BT_LE_SCAN_DUPL_CACHE_SIZE
+#define CONFIG_BT_LE_SCAN_DUPL_CACHE_SIZE 100
+#endif
+#ifndef CONFIG_BT_LE_SCAN_DUPL_CACHE_REFRESH_PERIOD
+#define CONFIG_BT_LE_SCAN_DUPL_CACHE_REFRESH_PERIOD 0
+#endif
+#ifndef CONFIG_BT_LE_DFT_TX_POWER_LEVEL_DBM_EFF
+#define CONFIG_BT_LE_DFT_TX_POWER_LEVEL_DBM_EFF 9
+#endif
+
+#endif /* BTDM_ZEPHYR_CFG_H_ */

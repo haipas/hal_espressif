@@ -10,6 +10,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "sdkconfig.h"
+#ifdef __ZEPHYR__
+#include "btdm_zephyr_cfg.h"
+#endif
 #include "esp_err.h"
 
 #ifdef __cplusplus
