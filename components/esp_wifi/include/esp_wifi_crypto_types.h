@@ -77,6 +77,40 @@ typedef int (*esp_aes_128_encrypt_t)(const unsigned char *key, const unsigned ch
   */
 typedef int (*esp_aes_128_decrypt_t)(const unsigned char *key, const unsigned char *iv, unsigned char *data, int data_len);
 
+/*
+ * ESP32-S31 links the Wi-Fi libraries of ESP-IDF v6.1. Their
+ * wpa_crypto_funcs_t ends with the RFC 3394 key wrap callbacks (with an
+ * explicit KEK length). The structure is embedded by value in
+ * wifi_init_config_t, so its size has to match the libraries exactly or every
+ * later field of wifi_init_config_t (up to magic) is read at the wrong offset.
+ */
+#if CONFIG_IDF_TARGET_ESP32S31
+#define ESP_WIFI_CRYPTO_HAS_AES_KEY_WRAP 1
+#endif
+
+#if ESP_WIFI_CRYPTO_HAS_AES_KEY_WRAP
+/**
+  * @brief The AES key wrap (RFC 3394) callback function used by esp_wifi.
+  *
+  * @param kek  Key encryption key (KEK).
+  * @param kek_len  Length of the KEK in bytes.
+  * @param n  Length of the plaintext key in 64-bit units;
+  * @param plain  Plaintext key to be wrapped, n * 64 bits
+  * @param cipher  Wrapped key, (n + 1) * 64 bits
+  */
+typedef int (*esp_aes_wrap_t)(const unsigned char *kek, size_t kek_len, int n, const unsigned char *plain, unsigned char *cipher);
+
+/**
+  * @brief The AES key unwrap (RFC 3394) callback function used by esp_wifi.
+  *
+  * @param kek  Key encryption key (KEK).
+  * @param kek_len  Length of the KEK in bytes.
+  * @param n  Length of the plaintext key in 64-bit units;
+  * @param cipher  Wrapped key to be unwrapped, (n + 1) * 64 bits
+  * @param plain  Plaintext key, n * 64 bits
+  */
+typedef int (*esp_aes_unwrap_t)(const unsigned char *kek, size_t kek_len, int n, const unsigned char *cipher, unsigned char *plain);
+#else
 /**
   * @brief The AES wrap callback function used by esp_wifi.
   *
@@ -98,6 +132,7 @@ typedef int (*esp_aes_wrap_t)(const unsigned char *kek, int n, const unsigned ch
   *
   */
 typedef int (*esp_aes_unwrap_t)(const unsigned char *kek, int n, const unsigned char *cipher, unsigned char *plain);
+#endif
 
 /**
   * @brief The SHA256 callback function used by esp_wifi.
@@ -404,6 +439,10 @@ typedef struct wpa_crypto_funcs_t {
     esp_ccmp_encrypt_t ccmp_encrypt;                 /**< Encrypt data callback function using CCMP */
     esp_aes_gmac_t aes_gmac;                         /**< One-Key GMAC hash callback function with AES for MIC computation */
     esp_sha256_vector_t sha256_vector;               /**< SHA256 hash callback function for data vector */
+#if ESP_WIFI_CRYPTO_HAS_AES_KEY_WRAP
+    esp_aes_wrap_t aes_wrap;                         /**< The AES key wrap (RFC 3394) callback function used by esp_wifi */
+    esp_aes_unwrap_t aes_unwrap;                     /**< The AES key unwrap (RFC 3394) callback function used by esp_wifi */
+#endif
 } wpa_crypto_funcs_t;
 
 /**

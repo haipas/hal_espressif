@@ -111,6 +111,12 @@ typedef enum {
     WIFI_AUTH_WPA3_ENTERPRISE,  /**< Authenticate mode : WPA3-Enterprise Only Mode */
     WIFI_AUTH_WPA2_WPA3_ENTERPRISE, /**< Authenticate mode : WPA3-Enterprise Transition Mode */
     WIFI_AUTH_WPA_ENTERPRISE,   /**< Authenticate mode : WPA-Enterprise security */
+#if CONFIG_IDF_TARGET_ESP32S31
+    /* ESP-IDF v6.1 Wi-Fi libraries (used on ESP32-S31) report APs whose
+     * security configuration cannot be parsed with this value.
+     */
+    WIFI_AUTH_UNKNOWN,          /**< Scan parsed authmode: Unknown or invalid security configuration parsed during scan */
+#endif
     WIFI_AUTH_MAX
 } wifi_auth_mode_t;
 
