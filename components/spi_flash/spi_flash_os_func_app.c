@@ -200,9 +200,13 @@ static esp_err_t spi_flash_os_check_yield(void *arg, uint32_t chip_status, uint3
 static esp_err_t spi_flash_os_yield(void *arg, uint32_t* out_status)
 {
     /* k_sleep requires an active thread context. Skip the yield if the
-     * kernel is not yet running (e.g. early boot flash erase recovery).
+     * kernel is not yet running (e.g. early boot flash erase recovery),
+     * and in interrupt or exception context: the fatal-error path erases
+     * the coredump partition from there, and a sleep would swap out of the
+     * exception with the nest count still raised, handing it to the next
+     * thread (3d local, Jenni 2026-10-01).
      */
-    if (!k_is_pre_kernel()) {
+    if (!k_is_pre_kernel() && !k_is_in_isr()) {
 #ifdef CONFIG_SPI_FLASH_ERASE_YIELD_MS
         k_sleep(K_MSEC(CONFIG_SPI_FLASH_ERASE_YIELD_MS));
 #else
