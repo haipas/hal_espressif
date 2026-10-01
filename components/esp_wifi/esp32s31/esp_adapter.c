@@ -449,6 +449,14 @@ static int32_t task_create_pinned_to_core_wrapper(void *task_func, const char *n
     }
 
     /*
+     * The heap block is not zeroed and k_thread_create() does not clear the
+     * whole struct k_thread: custom_data (freed by task_delete_wrapper) and,
+     * with FPU_SHARING, the saved FP context would start as leftover heap
+     * contents.
+     */
+    memset(t, 0, sizeof(*t));
+
+    /*
      * Clamp blob task priorities to the valid Zephyr preemptible range. Values
      * above the range all collapse to the lowest preemptible priority, so their
      * relative order is not preserved.
