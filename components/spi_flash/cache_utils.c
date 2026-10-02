@@ -33,6 +33,7 @@
 #include "esp_private/cache_utils.h"
 #include "esp_private/spi_flash_os.h"
 #include "esp_private/critical_section.h"
+#include "esp_rom_sys.h"
 #include "esp_log.h"
 
 ESP_LOG_ATTR_TAG(TAG, "cache");
@@ -87,6 +88,22 @@ void spi_flash_op_unlock(void)
 
 void IRAM_ATTR spi_flash_disable_interrupts_caches_and_other_cpu(void)
 {
+#if CONFIG_SPIRAM
+    /* 3d local, the counterpart of ESP-IDF's esp_task_stack_is_sane_cache_disabled()
+     * assert: flash and PSRAM share the MSPI bus, so with the cache off the
+     * caller cannot reach a PSRAM stack -- not even to reload its own spilled
+     * register windows (0xbad00b2d, double exception, the parked peer waits
+     * forever). Fail loudly, with the thread's name, before anything is off
+     * (Jenni 2026-10-02: gnss_serial persisting a detected baudrate).
+     */
+    if (!k_is_pre_kernel() && !k_is_in_isr() && esp_ptr_external_ram(__builtin_frame_address(0))) {
+        const char *name = k_thread_name_get(k_current_get());
+
+        esp_rom_printf("spi_flash: flash op from PSRAM stack, thread '%s'\n",
+                       name != NULL ? name : "?");
+        k_panic();
+    }
+#endif
     /* Park the peer first, so the pause lock is the outermost lock. The locks
      * taken below are cross-core, and a core that blocks on one of them does so
      * with interrupts disabled, which would leave it unable to answer the stall
