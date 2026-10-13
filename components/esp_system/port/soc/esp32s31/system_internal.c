@@ -52,8 +52,6 @@ void esp_system_reset_modules_on_exit(void)
 
 static void IRAM_ATTR __attribute__((noinline, noreturn)) esp_restart_noos_inner(void)
 {
-    const uint32_t core_id = esp_cpu_get_core_id();
-
     // Disable cache
 #if CONFIG_SPIRAM
     Cache_WriteBack_All(CACHE_MAP_L1_DCACHE);
@@ -76,23 +74,23 @@ static void IRAM_ATTR __attribute__((noinline, noreturn)) esp_restart_noos_inner
     REG_CLR_BIT(HP_SYS_HP_PSRAM_FLASH_ADDR_INTERCHANGE_REG, HP_SYS_HP_PSRAM_FLASH_ADDR_INTERCHANGE_DMA | HP_SYS_HP_PSRAM_FLASH_ADDR_INTERCHANGE_CPU);
 #endif
 
-    // Reset CPUs
-    if (core_id == 0) {
-        // Running on PRO CPU: APP CPU is stalled. Can reset both CPUs.
-#if !CONFIG_ESP_SYSTEM_SINGLE_CORE_MODE
-        esp_cpu_reset(1);
-#endif
-        esp_cpu_reset(0);
-    }
-#if !CONFIG_ESP_SYSTEM_SINGLE_CORE_MODE
-    else {
-        // Running on APP CPU: need to reset PRO CPU and unstall it,
-        // then reset APP CPU
-        esp_cpu_reset(0);
-        esp_cpu_unstall(0);
-        esp_cpu_reset(1);
-    }
-#endif
+    /*
+     * Reset the whole HP digital core, not only the CPUs.
+     *
+     * A CPU reset (esp_cpu_reset(), reason SW_CPU_RESET) leaves the HP
+     * peripherals running, and esp_system_reset_modules_on_exit() does not
+     * stop them on this chip yet (IDF-14841). The Wi-Fi MAC keeps writing
+     * received frames by DMA into the RX buffers the application allocated
+     * in HP SRAM, which is where the ROM loads the 2nd stage bootloader and
+     * where that bootloader keeps its data and stack. A frame arriving
+     * during the next boot corrupts them: ROM "SHA-256 comparison failed",
+     * MCUboot "Image in the primary slot is not valid" or a fault in the
+     * bootloader. The EMAC, USB OTG and GDMA masters can do the same.
+     * A digital core reset (reason SW_SYS_RESET) resets all of them and
+     * the MSPI clock setup, like the reset pin does, and keeps the LP
+     * domain (reset reason hint, RTC memory).
+     */
+    esp_rom_software_reset_system();
 
     ESP_INFINITE_LOOP();
 }
