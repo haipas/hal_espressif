@@ -90,6 +90,20 @@ static void IRAM_ATTR __attribute__((noinline, noreturn)) esp_restart_noos_inner
      * the MSPI clock setup, like the reset pin does, and keeps the LP
      * domain (reset reason hint, RTC memory).
      */
+#if !CONFIG_ESP_SYSTEM_SINGLE_CORE_MODE
+    /*
+     * The software stall of the other core (PMU cpu_stall_sw, set by
+     * esp_restart_noos()) is an LP register and survives the digital core
+     * reset. Left at 0x86, the other core stays stalled through the next
+     * boot, and with it every systimer counter that may stall by CPU1 -- the
+     * reset default for the OS tick counter (UNIT1_CORE1_STALL_EN): a
+     * single-core image started next (an MCUboot revert, a downgrade) hangs
+     * in its first k_busy_wait(). Release it here; that core was reset in
+     * esp_restart_noos() and its ROM boot address is cleared above, so it
+     * only reaches the ROM wait loop before the reset below takes it down.
+     */
+    esp_cpu_unstall((esp_cpu_get_core_id() == 0) ? 1 : 0);
+#endif
     esp_rom_software_reset_system();
 
     ESP_INFINITE_LOOP();
