@@ -25,6 +25,7 @@ LOG_MODULE_REGISTER(esp32s31_wifi_adapter, CONFIG_WIFI_LOG_LEVEL);
 #include "esp_random.h"
 #include "esp_mac.h"
 #include "esp_attr.h"
+#include "esp_cpu.h"
 #include "esp_timer.h"
 #include "esp_heap_caps.h"
 #include "esp_system.h"
@@ -185,9 +186,34 @@ static void wifi_delete_queue_wrapper(void *queue)
     wifi_delete_queue(queue);
 }
 
+/* Core the Wi-Fi task is pinned to and the MAC interrupt is routed to. */
+#define WIFI_ADAPTER_TASK_CORE (IS_ENABLED(CONFIG_ESP32_WIFI_TASK_PINNED_TO_CORE_1) ? 1 : 0)
+
+/*
+ * Under SMP the blob assumes its task and its MAC interrupt share one core.
+ * The interrupt is routed to cpu_no, but the handler (set_isr_wrapper(),
+ * per-core line handlers in intc_esp32.c) and the CLIC enable
+ * (enable_intr_wrapper()) act on the calling core. All three only agree when
+ * the blob sets the interrupt up from the Wi-Fi core; say so loudly if not.
+ */
+static void wifi_adapter_check_core(const char *what, int32_t cpu_no)
+{
+#if defined(CONFIG_SMP)
+    int32_t here = (int32_t)esp_cpu_get_core_id();
+
+    if (here != WIFI_ADAPTER_TASK_CORE || (cpu_no >= 0 && cpu_no != WIFI_ADAPTER_TASK_CORE)) {
+        LOG_ERR("%s on cpu%d for cpu%d, Wi-Fi core is cpu%d", what, (int)here, (int)cpu_no,
+                WIFI_ADAPTER_TASK_CORE);
+    }
+#else
+    ARG_UNUSED(what);
+    ARG_UNUSED(cpu_no);
+#endif
+}
+
 static void set_intr_wrapper(int32_t cpu_no, uint32_t intr_source, uint32_t intr_num, int32_t intr_prio)
 {
-    ARG_UNUSED(cpu_no);
+    wifi_adapter_check_core("set_intr", cpu_no);
 
     esp_rom_route_intr_matrix(cpu_no, intr_source, intr_num);
     esprv_int_set_priority(intr_num, intr_prio);
@@ -202,6 +228,8 @@ static void clear_intr_wrapper(uint32_t intr_source, uint32_t intr_num)
 
 static void set_isr_wrapper(int32_t n, void *f, void *arg)
 {
+    wifi_adapter_check_core("set_isr", -1);
+
     irq_disable(n);
     irq_connect_dynamic(n, 0, f, arg, 0);
     irq_enable(n);
@@ -209,6 +237,8 @@ static void set_isr_wrapper(int32_t n, void *f, void *arg)
 
 static void enable_intr_wrapper(uint32_t intr_mask)
 {
+    wifi_adapter_check_core("ints_on", -1);
+
     esprv_int_enable(intr_mask);
 }
 
@@ -439,8 +469,6 @@ static uint32_t event_group_wait_bits_wrapper(void *event, uint32_t bits_to_wait
 
 static int32_t task_create_pinned_to_core_wrapper(void *task_func, const char *name, uint32_t stack_depth, void *param, uint32_t prio, void *task_handle, uint32_t core_id)
 {
-    ARG_UNUSED(core_id);
-
     uint32_t stack_size = MAX(stack_depth, CONFIG_ESP32_WIFI_TASK_STACK_SIZE);
     struct wifi_task *t = wifi_malloc(sizeof(*t));
 
@@ -472,11 +500,32 @@ static int32_t task_create_pinned_to_core_wrapper(void *task_func, const char *n
         return 0;
     }
 
+    /* Under SMP the blob assumes its task and its MAC interrupt share a core:
+     * create the task suspended, pin it to the core the blob asks for, then
+     * start it (as on the ESP32-S3). */
     k_tid_t tid = k_thread_create(&t->thread, t->stack, stack_size,
                       (k_thread_entry_t)task_func, param, NULL, NULL,
-                      prio, K_INHERIT_PERMS, K_NO_WAIT);
+                      prio, K_INHERIT_PERMS,
+                      IS_ENABLED(CONFIG_SMP) ? K_FOREVER : K_NO_WAIT);
 
     k_thread_name_set(tid, name);
+
+#if defined(CONFIG_SMP)
+    /* k_thread_cpu_pin() is only built with CONFIG_SCHED_CPU_MASK. Pinning is
+     * not optional here, so fail the build rather than let the task float. */
+    BUILD_ASSERT(IS_ENABLED(CONFIG_SCHED_CPU_MASK),
+                 "WIFI_ESP32 under SMP requires CONFIG_SCHED_CPU_MASK to pin the Wi-Fi task");
+
+    if (core_id >= CONFIG_MP_MAX_NUM_CPUS) {
+        core_id = WIFI_ADAPTER_TASK_CORE;
+    }
+    if (k_thread_cpu_pin(tid, (int)core_id) != 0) {
+        LOG_ERR("%s: pin to cpu%u failed", name, (unsigned int)core_id);
+    }
+    k_thread_start(tid);
+#else
+    ARG_UNUSED(core_id);
+#endif
 
     *(int32_t *)task_handle = (int32_t)tid;
     return 1;
@@ -484,7 +533,9 @@ static int32_t task_create_pinned_to_core_wrapper(void *task_func, const char *n
 
 static int32_t task_create_wrapper(void *task_func, const char *name, uint32_t stack_depth, void *param, uint32_t prio, void *task_handle)
 {
-    return task_create_pinned_to_core_wrapper(task_func, name, stack_depth, param, prio, task_handle, 0);
+    /* Tasks created without a core follow the Wi-Fi task's core. */
+    return task_create_pinned_to_core_wrapper(task_func, name, stack_depth, param, prio, task_handle,
+                                              WIFI_ADAPTER_TASK_CORE);
 }
 
 static void task_delete_wrapper(void *handle)

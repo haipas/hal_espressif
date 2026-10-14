@@ -24,6 +24,7 @@ LOG_MODULE_REGISTER(esp32_coex_adapter);
 #endif
 
 #include "esp_attr.h"
+#include "esp_critical_section.h"
 #include "esp_timer.h"
 #include "soc/rtc.h"
 #include "soc/soc_caps.h"
@@ -46,31 +47,37 @@ bool IRAM_ATTR esp_coex_common_env_is_chip_wrapper(void)
 #endif
 }
 
+/*
+ * The blob's "spin lock" is an ESP-IDF port mux: interrupts off on the calling
+ * core plus a lock that keeps the other core out, recursive on the owning
+ * core. esp_critical_section_t is exactly that (the per-core IRQ lock alone on
+ * a single-core build). irq_lock() takes Zephyr's global lock under SMP
+ * instead and serialises every blob critical section with every other
+ * irq_lock() user in the system.
+ */
 void *esp_coex_common_spin_lock_create_wrapper(void)
 {
-    unsigned int *spin_lock = (unsigned int *)k_malloc(sizeof(unsigned int));
-    if (spin_lock == NULL) {
+    esp_critical_section_t *mux = k_malloc(sizeof(*mux));
+
+    if (mux == NULL) {
         LOG_ERR("spin_lock_create_wrapper allocation failed");
         return NULL;
     }
 
-    *spin_lock = 0;
-    return (void *)spin_lock;
+    *mux = (esp_critical_section_t)ESP_CRITICAL_SECTION_INIT;
+    return mux;
 }
 
 uint32_t IRAM_ATTR esp_coex_common_int_disable_wrapper(void *wifi_int_mux)
 {
-    unsigned int *int_mux = (unsigned int *)wifi_int_mux;
-
-    *int_mux = irq_lock();
+    esp_critical_section_enter((esp_critical_section_t *)wifi_int_mux);
     return 0;
 }
 
 void IRAM_ATTR esp_coex_common_int_restore_wrapper(void *wifi_int_mux, uint32_t tmp)
 {
-    unsigned int *key = (unsigned int *)wifi_int_mux;
-
-    irq_unlock(*key);
+    ARG_UNUSED(tmp);
+    esp_critical_section_exit((esp_critical_section_t *)wifi_int_mux);
 }
 
 void IRAM_ATTR esp_coex_common_task_yield_from_isr_wrapper(void)
@@ -114,7 +121,9 @@ int32_t esp_coex_common_semphr_take_wrapper(void *semphr, uint32_t block_time_ti
     return 0;
 }
 
-int32_t esp_coex_common_semphr_give_wrapper(void *semphr)
+/* Also called from the MAC interrupt handler, keep it in IRAM like the other
+ * interrupt-side wrappers. */
+int32_t IRAM_ATTR esp_coex_common_semphr_give_wrapper(void *semphr)
 {
     k_sem_give((struct k_sem *)semphr);
     return 1;
